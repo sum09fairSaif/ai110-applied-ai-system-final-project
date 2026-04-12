@@ -60,7 +60,7 @@ The recommendation system assigns points based on the following rules, designed 
 
 The screenshot below shows the recommender loading the dataset and printing the top song recommendations with their scores and explanation strings.
 
-![Terminal output showing top song recommendations](images/recommender-output.png)
+![Terminal output showing top song recommendations](./images/recommender-output.png)
 
 ---
 
