@@ -122,6 +122,17 @@ class UserProfile:
     scoring_mode: str = "balanced"
 
 
+@dataclass
+class RecommendationDiagnostics:
+    """Detailed recommendation output with reliability signals for the caller."""
+
+    song: Dict
+    score: float
+    confidence: float
+    explanation: str
+    warnings: List[str]
+
+
 ScoringMode = Callable[[Dict[str, float]], float]
 
 SCORING_MODE_WEIGHTS = {
@@ -266,6 +277,19 @@ VALID_SCORING_MODES = set(SCORING_STRATEGIES)
 
 DIVERSITY_ARTIST_PENALTY = 1.25
 DIVERSITY_GENRE_PENALTY = 0.45
+LOW_CONFIDENCE_THRESHOLD = 0.50
+COMPONENT_MAXIMA = {
+    "genre_match": 1.0,
+    "mood_match": 1.0,
+    "energy_similarity": 2.0,
+    "acoustic_bonus": 0.5,
+    "popularity_fit": 0.75,
+    "era_fit": 0.9,
+    "mood_tag_overlap": 1.05,
+    "instrumental_fit": 0.6,
+    "vocal_presence_fit": 0.5,
+    "replay_value_fit": 0.45,
+}
 
 
 def get_scoring_mode(mode_name: Optional[str]) -> Tuple[str, ScoringMode]:
@@ -400,6 +424,40 @@ def validate_recommendation_request(user_prefs: Dict, songs: List[Dict], k: int)
 
     normalized_user_prefs["k"] = normalized_k
     return normalized_user_prefs
+
+
+def calculate_max_score_for_mode(mode_name: str) -> float:
+    """Estimate the highest achievable score for a scoring mode."""
+    weights = SCORING_MODE_WEIGHTS.get(mode_name, SCORING_MODE_WEIGHTS["balanced"])
+    return sum(
+        COMPONENT_MAXIMA.get(component_name, 0.0) * component_weight
+        for component_name, component_weight in weights.items()
+    )
+
+
+def calculate_recommendation_confidence(score: float, mode_name: str) -> float:
+    """Normalize a raw score into a 0-1 confidence estimate."""
+    max_score = calculate_max_score_for_mode(mode_name)
+    if max_score <= 0:
+        return 0.0
+    return _clamp(score / max_score, 0.0, 1.0)
+
+
+def build_recommendation_warnings(explanation: str, confidence: float) -> List[str]:
+    """Generate caution notes when the match looks weak or indirect."""
+    warnings = []
+
+    if confidence < LOW_CONFIDENCE_THRESHOLD:
+        warnings.append(
+            "Low-confidence recommendation: this match relies more on soft feature similarity than strong direct preference matches."
+        )
+
+    if "genre match" not in explanation and "mood match" not in explanation:
+        warnings.append(
+            "No exact genre or mood match was found, so this recommendation depends on secondary signals."
+        )
+
+    return warnings
 
 
 def _score_components(user_prefs: Dict, song: Dict) -> Tuple[Dict[str, float], List[str]]:
@@ -576,6 +634,15 @@ class Recommender:
         summary = ", ".join(reasons) if reasons else "balanced overall fit"
         return f"{mode_name} mode: {summary}"
 
+    def recommend_with_diagnostics(self, user: UserProfile, k: int = 5) -> List[RecommendationDiagnostics]:
+        """Return recommendations together with confidence scores and guardrail warnings."""
+        diagnostics = recommend_songs_with_diagnostics(
+            asdict(user),
+            [_song_to_dict(song) for song in self.songs],
+            k=k,
+        )
+        return [RecommendationDiagnostics(**item) for item in diagnostics]
+
 
 def load_songs(csv_path: str) -> List[Dict]:
     """Read the song data file and turn each row into a dictionary the recommender can use."""
@@ -627,3 +694,30 @@ def recommend_songs(user_prefs: Dict, songs: List[Dict], k: int = 5) -> List[Tup
 
     scored.sort(key=lambda item: item[1], reverse=True)
     return apply_diversity_reranking(scored, normalized_user_prefs["k"])
+
+
+def recommend_songs_with_diagnostics(
+    user_prefs: Dict,
+    songs: List[Dict],
+    k: int = 5,
+) -> List[Dict]:
+    """Return recommendation results with confidence estimates and caution warnings."""
+    normalized_user_prefs = validate_recommendation_request(user_prefs, songs, k)
+    ranked_results = recommend_songs(normalized_user_prefs, songs, k=normalized_user_prefs["k"])
+    mode_name = normalized_user_prefs["scoring_mode"]
+    diagnostics = []
+
+    for song, score, explanation in ranked_results:
+        confidence = calculate_recommendation_confidence(score, mode_name)
+        warnings = build_recommendation_warnings(explanation, confidence)
+        diagnostics.append(
+            {
+                "song": song,
+                "score": score,
+                "confidence": confidence,
+                "explanation": explanation,
+                "warnings": warnings,
+            }
+        )
+
+    return diagnostics

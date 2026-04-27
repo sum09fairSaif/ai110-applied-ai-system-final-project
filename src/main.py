@@ -14,7 +14,7 @@ import os
 import textwrap
 sys.path.insert(0, os.path.dirname(__file__))
 
-from recommender import load_songs, recommend_songs
+from recommender import load_songs, recommend_songs_with_diagnostics
 
 USER_PROFILES = {
     "High-Energy Pop": {
@@ -76,19 +76,23 @@ USER_PROFILES = {
 }
 
 
-def format_recommendation_table(recommendations: list[tuple[dict, float, str]]) -> str:
+def format_recommendation_table(recommendations: list[dict]) -> str:
     """Turn the recommendation results into a simple text table that is easy to read in the terminal."""
-    headers = ["Rank", "Title", "Artist", "Score", "Reasons"]
-    max_widths = [4, 22, 18, 5, 55]
+    headers = ["Rank", "Title", "Artist", "Score", "Confidence", "Warnings", "Reasons"]
+    max_widths = [4, 22, 18, 5, 10, 40, 55]
     rows = []
 
-    for rank, (song, score, explanation) in enumerate(recommendations, 1):
+    for rank, result in enumerate(recommendations, 1):
+        song = result["song"]
+        warnings = "; ".join(result["warnings"]) if result["warnings"] else "None"
         rows.append([
             str(rank),
             song["title"],
             song["artist"],
-            f"{score:.2f}",
-            explanation,
+            f'{result["score"]:.2f}',
+            f'{result["confidence"]:.2f}',
+            warnings,
+            result["explanation"],
         ])
 
     widths = []
@@ -134,7 +138,7 @@ def main() -> None:
 
     for profile_name, user_prefs in USER_PROFILES.items():
         print(f"\n--- Profile: {profile_name} ({user_prefs.get('scoring_mode', 'balanced')}) ---")
-        recommendations = recommend_songs(user_prefs, songs, k=5)
+        recommendations = recommend_songs_with_diagnostics(user_prefs, songs, k=5)
 
         print("\nTop recommendations:\n")
         print(format_recommendation_table(recommendations))
