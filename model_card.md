@@ -1,55 +1,102 @@
-# Model Card: VibeMatch 1.0
+# Model Card: MusixxMatch 1.0
 
 ## Model Name
-
-VibeMatch 1.0
-
----
+MusixxMatch 1.0
 
 ## Goal / Task
+MusixxMatch recommends songs from a structured catalog based on a listener profile. It is designed to match user preferences across genre, mood, energy, acoustic preference, popularity, era, mood tags, vocal presence, and replay value. The system also provides explanations, confidence scores, warnings, and self-critique notes to make its output easier to interpret and evaluate.
 
-This recommender suggests songs from a small catalog based on a user's taste profile. It tries to find songs that match the user's favorite genre, favorite mood, and target energy level. It also gives a small bonus to acoustic songs for users who like acoustic music.
-
----
+## Model Type
+MusixxMatch is an explainable, rules-based recommendation system rather than a generative model or a fine-tuned neural network. It combines:
+- profile-based scoring
+- diversity-aware reranking
+- confidence estimation
+- warning generation
+- a self-critique review loop
 
 ## Data Used
+The dataset contains 25 songs in [data/songs.csv](/c:/Users/saifs/ai110-applied-ai-system-final-project/data/songs.csv:1). Each song includes structured fields such as:
+- `title`
+- `artist`
+- `genre`
+- `mood`
+- `energy`
+- `tempo_bpm`
+- `valence`
+- `danceability`
+- `acousticness`
+- `popularity_0_100`
+- `release_decade`
+- `mood_tags`
+- `instrumentalness`
+- `vocal_presence`
+- `replay_value`
 
-The dataset has 25 songs in `data/songs.csv`. Each song includes `title`, `artist`, `genre`, `mood`, `energy`, `tempo_bpm`, `valence`, `danceability`, and `acousticness`. The data covers many genres and moods, but it is still very small. It does not include lyrics, language, culture, listening history, or real user feedback.
+The catalog is intentionally small and classroom-friendly, which makes the system easier to inspect but also limits its realism and coverage.
 
----
+## How the System Works
+1. User preferences are validated and normalized.
+2. Missing preference details are partly inferred from known genre and mood patterns.
+3. Each song is scored against the listener profile using interpretable weighted rules.
+4. A diversity reranker reduces repetition from the same artist or genre.
+5. Confidence is estimated from the score strength relative to the active scoring mode.
+6. Warnings are added for weak or indirect matches.
+7. A self-critique loop reviews the full list and can attach critique notes or adjust the ordering.
 
-## Algorithm Summary
+## Intended Use
+MusixxMatch is intended for classroom learning, experimentation, and portfolio demonstration. It is useful for showing how an applied AI system can combine recommendation logic with guardrails, evaluation, logging, and post-hoc critique.
 
-The system gives points to each song based on how well it matches the user profile. A song gets points for matching the user's genre and mood. It also gets a similarity score for how close its energy is to the user's target energy. If the user likes acoustic music, songs with high acousticness get a small extra bonus. After that, the songs are sorted from highest score to lowest score.
+## Out-of-Scope Use
+This system is not intended for production music platforms, commercial recommendation pipelines, or any high-stakes setting. It should not be treated as a complete or fair representation of real musical taste, and it does not use large-scale user behavior or cultural context.
 
----
+## Strengths
+- Transparent scoring logic makes the recommendations explainable.
+- Reliability features such as confidence scoring and warnings make weak cases easier to detect.
+- Logging and evaluation support reproducibility and traceability.
+- The self-critique loop adds an agentic second pass over the recommendation list.
+- The Streamlit app makes the system accessible to non-technical users.
 
-## Observed Behavior / Biases
+## Limitations and Biases
+- The catalog is small, so recommendation quality is constrained by limited coverage.
+- The system depends heavily on exact genre and mood labels, which can oversimplify music taste.
+- Hand-designed weights reflect my assumptions about what matters most, which introduces design bias.
+- The recommender does not use lyrics, language, listening history, or collaborative filtering signals.
+- Some recommendation lists may look plausible even when they rely mainly on soft feature similarity rather than direct preference matches.
 
-One pattern I noticed is that energy has a strong effect because every song receives an energy score. Genre and mood only help when there is an exact text match, so users with broader or more mixed tastes may not be represented well. This can create an "energy bubble" where songs with similar energy keep rising even if they are not the best musical fit. I also noticed that `Gym Hero` often ranked highly because its energy was close to several user profiles.
+## Evaluation
+MusixxMatch was evaluated using:
+- automated unit tests
+- recommendation logging
+- confidence scoring
+- warnings for weak matches
+- a dedicated evaluation harness over 8 predefined listener profiles
 
----
+Current evaluation summary:
+- profiles evaluated: `8`
+- average confidence: `0.58`
+- average low-confidence rate: `0.28`
+- average warning rate: `0.75`
+- average genre diversity: `0.88`
+- average exact-match rate: `0.53`
+- strongest profile: `Perfect Match with Acoustic`
+- weakest profile: `Conflicting High-Energy Moody`
 
-## Evaluation Process
+These results show that the system works best for clear preferences that are well represented in the catalog and struggles more when the profile is internally conflicting or only weakly supported by the available songs.
 
-I tested the recommender with eight user profiles, including High-Energy Pop, Chill Lofi, Deep Intense Rock, and some edge cases. I ran the CLI and compared the top results to my own musical intuition. I also changed the scoring weights to see how sensitive the rankings were. One surprising result was that `Gym Hero` showed up for several profiles that did not clearly want intense pop, which showed me that energy was sometimes doing too much work.
+## Risk Mitigations
+To reduce misuse or overconfidence, the system includes:
+- input validation and guardrails
+- confidence scoring
+- low-confidence warnings
+- critique notes for weak or repetitive lists
+- JSONL session logging
+- clear documentation of limitations
 
----
-
-## Intended Use and Non-Intended Use
-
-This system is meant for classroom learning and simple experimentation. It is useful for showing how a content-based recommender can turn user preferences into ranked song suggestions. It is not meant for real users, music streaming platforms, or high-stakes decisions. It should not be treated as a complete or fair model of real musical taste.
-
----
-
-## Ideas for Improvement
-
-- Add more user preference fields, such as tempo, valence, or danceability.
-- Use softer matching for related genres and moods instead of exact text matches only.
-- Improve diversity so the top recommendations are not all from one narrow vibe.
-
----
+## Future Improvements
+- add softer matching between related genres and moods
+- expand the song catalog
+- include richer preference signals such as tempo preferences or learned embeddings
+- improve the critique loop to reason about more nuanced recommendation failures
 
 ## Personal Reflection
-
-My biggest learning moment was seeing how a very simple scoring rule could still produce results that felt surprisingly believable. It showed me that recommendations do not need to be very complex before users start feeling like the system "understands" them. AI tools helped me move faster when I was writing, testing ideas, and explaining my design, but I still had to double-check the scoring logic, file changes, and README details to make sure they matched what the code actually did. I was also surprised that a song like `Gym Hero` could keep showing up for different profiles, which taught me how even a small weight choice can create bias or repetition. If I kept extending this project, I would try adding more features, softer category matching, and a diversity rule so the recommendations feel less repetitive.
+The most important lesson from building MusixxMatch was that reliability features can change the meaning of a recommendation system just as much as the ranking logic itself. Explanations, warnings, confidence scores, and evaluation made the final system much more trustworthy and much more aligned with responsible AI design.
