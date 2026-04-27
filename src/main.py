@@ -14,6 +14,7 @@ import os
 import textwrap
 sys.path.insert(0, os.path.dirname(__file__))
 
+from logging_utils import append_jsonl_log, build_recommendation_log_entry
 from recommender import load_songs, recommend_songs_with_diagnostics
 
 USER_PROFILES = {
@@ -139,9 +140,12 @@ def main() -> None:
     for profile_name, user_prefs in USER_PROFILES.items():
         print(f"\n--- Profile: {profile_name} ({user_prefs.get('scoring_mode', 'balanced')}) ---")
         recommendations = recommend_songs_with_diagnostics(user_prefs, songs, k=5)
+        log_entry = build_recommendation_log_entry(profile_name, user_prefs, recommendations)
+        log_path = append_jsonl_log(log_entry)
 
         print("\nTop recommendations:\n")
         print(format_recommendation_table(recommendations))
+        print(f"\nLog saved to: {log_path}")
 
 
 if __name__ == "__main__":
