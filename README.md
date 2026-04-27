@@ -34,6 +34,8 @@ MusixxMatch is organized as a modular pipeline:
 
 The Mermaid source for the architecture diagram is included in [assets/musixxmatch-architecture.mmd](/c:/Users/saifs/ai110-applied-ai-system-final-project/assets/musixxmatch-architecture.mmd:1). You can paste it into Mermaid Live Editor and export a PNG into the `assets/` folder.
 
+![MusixxMatch architecture diagram](assets/musixxmatch-architecture.png)
+
 ## Repository Structure
 - [src/recommender.py](/c:/Users/saifs/ai110-applied-ai-system-final-project/src/recommender.py:1): core scoring, confidence, warnings, and self-critique logic
 - [src/main.py](/c:/Users/saifs/ai110-applied-ai-system-final-project/src/main.py:1): CLI entry point
