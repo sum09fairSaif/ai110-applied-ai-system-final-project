@@ -177,25 +177,30 @@ SCORING_MODE_WEIGHTS = {
 
 
 def _clamp(value: float, lower: float, upper: float) -> float:
+    """Keep a number inside a safe minimum and maximum range."""
     return max(lower, min(upper, value))
 
 
 def _similarity_score(value: float, target: float, max_points: float, scale: float = 1.0) -> float:
+    """Give more points when a song value is close to the user's target value."""
     distance = abs(value - target) / scale
     return max(0.0, (1.0 - distance) * max_points)
 
 
 def _parse_mood_tags(raw_tags: str) -> List[str]:
+    """Split the mood tag text into a clean list of individual tags."""
     if not raw_tags:
         return []
     return [tag.strip().lower() for tag in raw_tags.split("|") if tag.strip()]
 
 
 def _coalesce(value, fallback):
+    """Use the fallback value only when the first value is missing."""
     return fallback if value is None else value
 
 
 def _parse_release_decade(raw_value) -> int:
+    """Convert a decade label like '2010s' into a number the program can compare."""
     if isinstance(raw_value, int):
         return raw_value
     cleaned = str(raw_value).strip().lower().replace("s", "")
@@ -203,6 +208,7 @@ def _parse_release_decade(raw_value) -> int:
 
 
 def _infer_preference_targets(user_prefs: Dict) -> Dict:
+    """Fill in helpful default preferences when the user did not supply every advanced setting."""
     favorite_genre = user_prefs.get("favorite_genre", "")
     favorite_mood = user_prefs.get("favorite_mood", "")
     likes_acoustic = user_prefs.get("likes_acoustic", False)
@@ -237,13 +243,16 @@ def _infer_preference_targets(user_prefs: Dict) -> Dict:
 
 
 def _song_to_dict(song: Song) -> Dict:
+    """Convert a Song object into a regular dictionary for easier scoring work."""
     song_dict = asdict(song)
     song_dict["mood_tags"] = song_dict.get("mood_tags", "")
     return song_dict
 
 
 def _build_weighted_mode(weights: Dict[str, float]) -> ScoringMode:
+    """Create a scoring function that combines score parts using the chosen weights."""
     def weighted_mode(components: Dict[str, float]) -> float:
+        """Add up the score pieces after multiplying each one by its importance."""
         return sum(components.get(name, 0.0) * weight for name, weight in weights.items())
 
     return weighted_mode
@@ -254,13 +263,18 @@ SCORING_STRATEGIES = {
     for mode_name, weights in SCORING_MODE_WEIGHTS.items()
 }
 
+DIVERSITY_ARTIST_PENALTY = 1.25
+DIVERSITY_GENRE_PENALTY = 0.45
+
 
 def get_scoring_mode(mode_name: Optional[str]) -> Tuple[str, ScoringMode]:
+    """Choose the scoring style the user asked for, or fall back to the default mode."""
     normalized_mode = (mode_name or "balanced").strip().lower()
     return normalized_mode, SCORING_STRATEGIES.get(normalized_mode, SCORING_STRATEGIES["balanced"])
 
 
 def _score_components(user_prefs: Dict, song: Dict) -> Tuple[Dict[str, float], List[str]]:
+    """Calculate the individual score pieces for one song before they are combined into a final score."""
     components = {
         "genre_match": 0.0,
         "mood_match": 0.0,
@@ -357,6 +371,48 @@ def _score_components(user_prefs: Dict, song: Dict) -> Tuple[Dict[str, float], L
     return components, reasons
 
 
+def apply_diversity_reranking(
+    scored_candidates: List[Tuple[Dict, float, List[str]]],
+    k: int,
+    artist_penalty: float = DIVERSITY_ARTIST_PENALTY,
+    genre_penalty: float = DIVERSITY_GENRE_PENALTY,
+) -> List[Tuple[Dict, float, str]]:
+    """Build the final top results while lowering the score of repeated artists or genres."""
+    selected: List[Tuple[Dict, float, str]] = []
+    remaining = scored_candidates[:]
+    seen_artists: set[str] = set()
+    seen_genres: set[str] = set()
+
+    while remaining and len(selected) < k:
+        best_index = 0
+        best_adjusted_score = float("-inf")
+        best_explanation = "no matches"
+
+        for index, (song, base_score, reasons) in enumerate(remaining):
+            adjusted_score = base_score
+            adjusted_reasons = list(reasons)
+
+            if song["artist"] in seen_artists:
+                adjusted_score -= artist_penalty
+                adjusted_reasons.append(f"artist diversity penalty (-{artist_penalty:.2f})")
+
+            if song["genre"] in seen_genres:
+                adjusted_score -= genre_penalty
+                adjusted_reasons.append(f"genre diversity penalty (-{genre_penalty:.2f})")
+
+            if adjusted_score > best_adjusted_score:
+                best_adjusted_score = adjusted_score
+                best_index = index
+                best_explanation = ", ".join(adjusted_reasons) if adjusted_reasons else "no matches"
+
+        song, _, _ = remaining.pop(best_index)
+        selected.append((song, best_adjusted_score, best_explanation))
+        seen_artists.add(song["artist"])
+        seen_genres.add(song["genre"])
+
+    return selected
+
+
 @dataclass
 class Recommender:
     """
@@ -367,18 +423,20 @@ class Recommender:
     songs: List[Song]
 
     def recommend(self, user: UserProfile, k: int = 5) -> List[Song]:
-        """Return the top-k songs for a user profile."""
+        """Pick the best songs for a user after scoring them and applying the diversity rules."""
         user_prefs = asdict(user)
         ranked = []
         for song in self.songs:
-            score, _ = score_song(user_prefs, _song_to_dict(song))
-            ranked.append((song, score))
+            score, reasons = score_song(user_prefs, _song_to_dict(song))
+            ranked.append((_song_to_dict(song), score, reasons))
 
         ranked.sort(key=lambda item: item[1], reverse=True)
-        return [song for song, _ in ranked[:k]]
+        diversified = apply_diversity_reranking(ranked, k)
+        song_by_id = {song.id: song for song in self.songs}
+        return [song_by_id[item[0]["id"]] for item in diversified]
 
     def explain_recommendation(self, user: UserProfile, song: Song) -> str:
-        """Summarize why a song was recommended for a user."""
+        """Explain in simple text why a song matched this user's preferences."""
         _, reasons = score_song(asdict(user), _song_to_dict(song))
         mode_name, _ = get_scoring_mode(user.scoring_mode)
         summary = ", ".join(reasons) if reasons else "balanced overall fit"
@@ -386,10 +444,7 @@ class Recommender:
 
 
 def load_songs(csv_path: str) -> List[Dict]:
-    """
-    Loads songs from a CSV file.
-    Required by src/main.py
-    """
+    """Read the song data file and turn each row into a dictionary the recommender can use."""
 
     print(f"Loading songs from {csv_path}...")
     songs = []
@@ -419,10 +474,7 @@ def load_songs(csv_path: str) -> List[Dict]:
 
 
 def score_song(user_prefs: Dict, song: Dict) -> Tuple[float, List[str]]:
-    """
-    Scores a single song against user preferences.
-    Required by recommend_songs() and src/main.py
-    """
+    """Give one song a score by comparing its features to what the user likes."""
 
     mode_name, score_strategy = get_scoring_mode(user_prefs.get("scoring_mode"))
     components, reasons = _score_components(user_prefs, song)
@@ -432,16 +484,12 @@ def score_song(user_prefs: Dict, song: Dict) -> Tuple[float, List[str]]:
 
 
 def recommend_songs(user_prefs: Dict, songs: List[Dict], k: int = 5) -> List[Tuple[Dict, float, str]]:
-    """
-    Functional implementation of the recommendation logic.
-    Required by src/main.py
-    """
+    """Score all songs, sort them, and return the best few with short explanations."""
 
     scored = []
     for song in songs:
         score, reasons = score_song(user_prefs, song)
-        explanation = ", ".join(reasons) if reasons else "no matches"
-        scored.append((song, score, explanation))
+        scored.append((song, score, reasons))
 
     scored.sort(key=lambda item: item[1], reverse=True)
-    return scored[:k]
+    return apply_diversity_reranking(scored, k)

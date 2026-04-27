@@ -77,7 +77,7 @@ USER_PROFILES = {
 
 
 def format_recommendation_table(recommendations: list[tuple[dict, float, str]]) -> str:
-    """Format recommendations as a simple ASCII table for terminal output."""
+    """Turn the recommendation results into a simple text table that is easy to read in the terminal."""
     headers = ["Rank", "Title", "Artist", "Score", "Reasons"]
     max_widths = [4, 22, 18, 5, 55]
     rows = []
@@ -97,10 +97,12 @@ def format_recommendation_table(recommendations: list[tuple[dict, float, str]]) 
         widths.append(min(max(len(header), cell_width), max_widths[col_idx]))
 
     def wrap_cell(value: str, width: int) -> list[str]:
+        """Break a long piece of text into smaller lines so it fits inside one table cell."""
         wrapped = textwrap.wrap(value, width=width, break_long_words=False)
         return wrapped or [""]
 
     def make_row_lines(values: list[str]) -> list[str]:
+        """Build one full table row, even when some cells need multiple wrapped lines."""
         wrapped_columns = [wrap_cell(value, widths[idx]) for idx, value in enumerate(values)]
         row_height = max(len(column) for column in wrapped_columns)
         lines = []
@@ -126,6 +128,7 @@ def format_recommendation_table(recommendations: list[tuple[dict, float, str]]) 
 
 
 def main() -> None:
+    """Load the songs, run each sample user profile, and print the top recommendations."""
     songs = load_songs("data/songs.csv")
     print(f"Loaded songs: {len(songs)}")
 
