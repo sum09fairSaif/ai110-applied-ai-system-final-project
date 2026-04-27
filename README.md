@@ -1,188 +1,204 @@
-# Music Recommender Simulation
+# MusixxMatch: An Explainable, Reliable, and Self-Critiquing Music Recommendation System
+
+## Original Project
+This project extends my earlier **Music Recommender Simulation** from Modules 1-3. The original version was a CLI-based content recommender that matched songs to a listener profile using genre, mood, energy, and acoustic preference. Its goal was to show how a transparent scoring system could produce personalized recommendations from a structured music catalog.
+
+For this final project, I redesigned that prototype into a more complete applied AI system with guardrails, confidence scoring, logging, automated evaluation, an agentic self-critique loop, and a Streamlit interface. The final system still values explainability, but now it also makes reliability and uncertainty visible.
 
 ## Project Summary
+**MusixxMatch** is an explainable music recommendation system that helps listeners discover songs aligned with their preferences while exposing how the recommendation was made. Instead of acting like a black box, MusixxMatch scores songs using interpretable features, estimates confidence, warns when matches are weak, logs recommendation sessions, and runs a self-critique pass over its own output.
 
-This project is a CLI-first music recommender simulation that suggests songs from a small catalog using a content-based scoring system. I expanded the dataset, created multiple user taste profiles, and ranked songs by how well they matched each profile's genre, mood, energy, and acoustic preference. The goal of this version is to keep the logic simple and explainable while still showing how recommendation systems can reflect user preferences, produce different outputs for different listeners, and reveal biases in the scoring design.
+This project matters because recommendation systems shape attention and taste. MusixxMatch demonstrates a more responsible approach by combining personalization with transparency, reliability checks, and explicit limitations.
 
----
+## Core AI Features
+This project satisfies the final-project requirement through two integrated AI feature areas:
 
-## How The System Works
+- **Reliability or Testing System:** MusixxMatch validates inputs, assigns confidence scores, adds low-confidence warnings, logs recommendation runs, and includes an evaluation harness plus automated tests.
+- **Agentic Workflow:** After generating recommendations, the system runs a self-critique loop that reviews the list, flags weak or repetitive results, and can promote a stronger second choice over a weaker top pick.
 
-Real-world recommenders usually combine many signals, such as what similar users liked, what features a song has, and what someone seems to want in the current moment. My simulation focuses on the content-based part of that idea: it compares the attributes of each song to a user's taste profile and gives higher scores to songs that are closer to the user's preferred vibe. In this version, I prioritize transparent and explainable recommendations over complexity, so the system rewards strong matches in genre, mood, and a few numeric audio features rather than trying to learn from large-scale user behavior.
+## Stretch Features
+- **Agentic Workflow Enhancement (+2):** I implemented a multi-step reasoning loop that generates recommendations, critiques the resulting list, adds critique notes, and can adjust the final ranking.
+- **Test Harness / Evaluation Script (+2):** I built an evaluation script that runs the system on predefined listener profiles and reports confidence, warning rate, diversity, exact-match rate, and strongest versus weakest profile performance.
 
-This music recommender uses a point-based scoring algorithm to match songs to user preferences. The system loads songs from a CSV file, scores each song individually against the user's profile, ranks them by score, and returns the top recommendations.
+## Architecture Overview
+MusixxMatch is organized as a modular pipeline:
 
-### Algorithm Recipe
+1. The user enters preferences through the CLI or Streamlit app.
+2. A guardrail layer validates and normalizes the input.
+3. The scoring engine compares each song to the user profile across genre, mood, energy, popularity, era, mood tags, vocal presence, and replay value.
+4. A diversity reranker reduces repetition from the same artist or genre.
+5. A confidence layer estimates recommendation strength and adds warnings for weak matches.
+6. A self-critique loop reviews the overall list and attaches higher-level critique notes, and in some cases adjusts the ordering.
+7. The final recommendations are shown to the user and saved to a JSONL log.
+8. A separate evaluation harness tests the system across predefined profiles and summarizes reliability metrics.
 
-1. Genre match adds points when the song's genre matches the user's favorite genre.
-2. Mood match adds points when the song's mood matches the user's favorite mood.
-3. Energy similarity adds more points when the song's energy is close to the user's target energy.
-4. Acoustic preference adds a small bonus when the user likes acoustic songs and the song has high acousticness.
+The Mermaid source for the architecture diagram is included in [assets/musixxmatch-architecture.mmd](/c:/Users/saifs/ai110-applied-ai-system-final-project/assets/musixxmatch-architecture.mmd:1). You can paste it into Mermaid Live Editor and export a PNG into the `assets/` folder.
 
-`Song` features used in this simulation:
+## Repository Structure
+- [src/recommender.py](/c:/Users/saifs/ai110-applied-ai-system-final-project/src/recommender.py:1): core scoring, confidence, warnings, and self-critique logic
+- [src/main.py](/c:/Users/saifs/ai110-applied-ai-system-final-project/src/main.py:1): CLI entry point
+- [src/streamlit_app.py](/c:/Users/saifs/ai110-applied-ai-system-final-project/src/streamlit_app.py:1): Streamlit app for MusixxMatch
+- [src/evaluate.py](/c:/Users/saifs/ai110-applied-ai-system-final-project/src/evaluate.py:1): evaluation harness
+- [src/logging_utils.py](/c:/Users/saifs/ai110-applied-ai-system-final-project/src/logging_utils.py:1): JSONL logging helpers
+- [src/profiles.py](/c:/Users/saifs/ai110-applied-ai-system-final-project/src/profiles.py:1): shared listener profiles for demos and evaluation
+- [tests](/c:/Users/saifs/ai110-applied-ai-system-final-project/tests): automated test suite
+- [data/songs.csv](/c:/Users/saifs/ai110-applied-ai-system-final-project/data/songs.csv:1): song catalog
 
-- `title`
-- `artist`
-- `genre`
-- `mood`
-- `energy`
-- `tempo_bpm`
-- `valence`
-- `danceability`
-- `acousticness`
+## Setup Instructions
+1. Clone the repository:
 
-`UserProfile` features used in this simulation:
+```bash
+git clone <your-repo-url>
+cd applied-ai-system-final-project
+```
 
-- preferred `genre`
-- preferred `mood`
-- preferred `energy`
-- `likes_acoustic`
-
-### Example Output
-
-The screenshot below shows the recommender loading the dataset and printing the top song recommendations with their scores and explanation strings.
-
-![Terminal output showing top song recommendations](images/recommender-output.png)
-
-### User Profile Recommendation Screenshots
-
-The following screenshots show recommendation outputs for multiple user profiles tested in the CLI-first simulation.
-
-#### User Profile 1
-
-![User Profile 1 recommendation output](images/User%20Profile%201%20Recommendation.png)
-
-#### User Profile 2
-
-![User Profile 2 recommendation output](images/User%20Profile%202%20Recommendation.png)
-
-#### User Profile 3
-
-![User Profile 3 recommendation output](images/User%20Profile%203%20Recommendation.png)
-
-#### User Profile 4
-
-![User Profile 4 recommendation output](images/User%20Profile%204%20Recommendation.png)
-
-#### User Profile 5
-
-![User Profile 5 recommendation output](images/User%20Profile%205%20Recommendation.png)
-
-#### User Profile 6
-
-![User Profile 6 recommendation output](images/User%20Profile%206%20Recommendation.png)
-
-#### User Profile 7
-
-![User Profile 7 recommendation output](images/User%20Profile%207%20Recommendation.png)
-
-#### User Profile 8
-
-![User Profile 8 recommendation output](images/User%20Profile%208%20Recommendation.png)
-
----
-
-## Getting Started
-
-### Setup
-
-1. Create a virtual environment if you want:
+2. Create and activate a virtual environment if desired:
 
 ```bash
 python -m venv .venv
-source .venv/bin/activate
-```
-
-On Windows:
-
-```bash
 .venv\Scripts\activate
 ```
 
-2. Install dependencies:
+3. Install dependencies:
 
 ```bash
 pip install -r requirements.txt
 ```
 
-3. Run the app:
+4. Run the CLI version:
 
 ```bash
 python -m src.main
 ```
 
-### Running Tests
-
-Run the starter tests with:
+5. Run the evaluation harness:
 
 ```bash
-pytest
+python -m src.evaluate
 ```
 
----
+6. Run the Streamlit app:
 
-## Experiments You Tried
+```bash
+streamlit run src/streamlit_app.py
+```
 
-I tested the recommender with eight different user profiles so I could see whether the output changed in believable ways. Profiles like `Chill Lofi` and `Deep Intense Rock` gave clearly different top songs, which made the system feel valid because it was responding to real preference changes instead of always repeating the same result.
+7. Run the automated tests:
 
-One important experiment was changing the weights so energy mattered more and genre mattered less. That made some rankings feel more natural. For example, `Rooftop Lights` moved above `Gym Hero` for a happy pop listener because it fit the mood and energy better, even without the exact same genre label.
+```bash
+python -m pytest -q
+```
 
-I also compared low-energy and high-energy boundary profiles to test the sensitivity of the energy rule. Those experiments showed that the system responds strongly to energy, which is useful, but they also revealed that energy can dominate too much and cause certain songs to appear again and again.
+## Sample Interactions
 
----
+### Example 1: High-Energy Pop Listener
+**Input**
+- favorite genre: `pop`
+- favorite mood: `happy`
+- target energy: `0.8`
+- likes acoustic: `False`
+- scoring mode: `genre_first`
 
-## Limitations and Risks
+**Output**
+- top recommendation: `Sunrise City - Neon Echo`
+- confidence: `0.85`
+- warnings: `None`
+- explanation included genre match, mood match, energy similarity, popularity fit, preferred era match, mood-tag overlap, and replay-value fit
 
-This recommender has a very small catalog, so it cannot represent the full range of real music taste. It also does not use lyrics, language, listening history, or artist popularity, which means it misses many important reasons why people like songs.
+### Example 2: Conflicting High-Energy Moody Listener
+**Input**
+- favorite genre: `pop`
+- favorite mood: `moody`
+- target energy: `0.9`
+- likes acoustic: `False`
+- scoring mode: `mood_first`
 
-Another limitation is that genre and mood only work on exact text matches. If two songs are close in style but use different labels, the system may treat them as unrelated. That can make the output feel narrow for users with mixed or flexible tastes.
+**Output**
+- top recommendation: `Night Drive Loop - Neon Echo`
+- average confidence across the list was low
+- weaker recommendations were flagged with low-confidence warnings
+- the self-critique loop added a note that the list should be treated as exploratory suggestions
 
-The biggest risk in the current scoring system is that energy can become too powerful. Because every song receives an energy score, songs with similar energy can keep appearing near the top even when they are not the best match in genre or mood. This is why a song like `Gym Hero` can show up for users who did not really want intense pop.
+### Example 3: Perfect Match with Acoustic Listener
+**Input**
+- favorite genre: `lofi`
+- favorite mood: `chill`
+- target energy: `0.4`
+- likes acoustic: `True`
+- scoring mode: `genre_first`
 
----
+**Output**
+- top recommendation: `Midnight Coding - LoRoom`
+- confidence: `0.88`
+- warnings: `None`
+- self-critique noted that the broader list leaned heavily on one artist, surfacing a discovery-diversity trade-off
+
+## Design Decisions and Trade-Offs
+I chose an explainable rules-based recommender instead of a black-box model because the project goal was not only to generate recommendations, but to make the system’s reasoning visible and testable. This made it possible to attach confidence scores, warnings, critique notes, and evaluation metrics directly to the recommendation pipeline.
+
+I also separated the project into focused modules for scoring, logging, evaluation, shared demo profiles, and the Streamlit app. That modular structure made it easier to add new features incrementally and test each one in isolation.
+
+The main trade-off is interpretability versus flexibility. Exact labels and hand-designed weights make the output easier to understand, but they also limit nuance. A production recommender would likely use softer similarity matching, larger catalogs, user behavior signals, and richer embeddings.
+
+## Testing Summary
+MusixxMatch includes automated tests, confidence scoring, warnings, logging, and a dedicated evaluation harness.
+
+Current status:
+- automated test suite: `20 passed`
+- root-level `pytest` execution is reproducible
+- JSONL recommendation logs are written successfully
+- CLI, evaluation harness, and Streamlit app all run successfully
+
+Evaluation summary from [src/evaluate.py](/c:/Users/saifs/ai110-applied-ai-system-final-project/src/evaluate.py:1):
+- profiles evaluated: `8`
+- average confidence: `0.58`
+- average low-confidence rate: `0.28`
+- average warning rate: `0.75`
+- average genre diversity: `0.88`
+- average exact-match rate: `0.53`
+- strongest profile: `Perfect Match with Acoustic`
+- weakest profile: `Conflicting High-Energy Moody`
+
+What worked well:
+- clear listener profiles produced believable recommendations
+- confidence scores and warnings made weak scenarios easier to spot
+- the self-critique loop surfaced list-level issues that a single recommendation score would miss
+
+What did not work as well:
+- conflicting or sparse preferences still produce weaker matches
+- exact genre and mood matching can be overly rigid
+- some recommendation lists are structurally reasonable but still musically imperfect because the catalog is small
 
 ## Reflection
+This project taught me that a useful AI system is not just about producing outputs, but about making those outputs trustworthy. A recommendation can look smart on the surface, but without guardrails, confidence estimates, warnings, logging, and evaluation, it is much harder to know when the system is actually behaving well.
 
-[**Model Card**](model_card.md)
+It also showed me how much professional polish can come from responsible engineering practices. The final system is still based on simple and interpretable logic, but adding reliability features and a user interface transformed it from a classroom prototype into a much more portfolio-ready applied AI project.
 
-My biggest learning moment in this project was realizing that even a simple point-based system can feel like a real recommendation engine when the features are chosen carefully. Once I tested several user profiles, I could see how small changes in genre, mood, or energy changed the ranking in ways that often felt intuitive. At the same time, I also saw how easy it is for a scoring rule to create bias, especially when one feature like energy affects every song and pushes certain tracks upward again and again.
+## Reflection and Ethics
 
-AI tools helped me move faster when I was brainstorming profiles, writing explanations, improving documentation, and testing how changes in weights affected the results. I still had to double-check the code, the math, and the written summaries, because a helpful suggestion is not always the same thing as a correct one. What surprised me most was how a simple algorithm could still "feel" smart, even though it was only using a few fields and hand-written rules. If I extended this project, I would add softer matching between related genres, include more song features in the score, and add a diversity rule so the top recommendations do not feel too repetitive.
+### What are the limitations or biases in the system?
+MusixxMatch depends on a small structured catalog, so the quality of its recommendations is constrained by the songs present in [data/songs.csv](/c:/Users/saifs/ai110-applied-ai-system-final-project/data/songs.csv:1). It also relies heavily on exact genre and mood labels, which can oversimplify music taste and miss songs that feel similar but use different metadata. Because the scoring system is hand-designed, it reflects my assumptions about which song attributes should matter most, which introduces design bias.
 
----
+### Could this AI be misused, and how would I prevent that?
+The system could be misused if someone treated its recommendations as objectively correct rather than as suggestions shaped by a small catalog and handcrafted scoring rules. It could also mislead users if confidence scores and warnings were hidden. To reduce misuse, I included transparent explanations, confidence scoring, low-confidence warnings, critique notes, JSONL logging, and clearly documented limitations.
 
-## 1. Model Name
+### What surprised me while testing reliability?
+What surprised me most was how reasonable some weak matches looked before confidence scoring and warnings were added. Without those layers, a recommendation could feel convincing even when it relied mostly on secondary signals rather than direct genre or mood matches. The evaluation harness made this especially visible for conflicting profiles like `Conflicting High-Energy Moody`.
 
-`VibeMatch 1.0`
+### How did I collaborate with AI during this project?
+AI was useful as a collaborator for brainstorming features, improving project structure, and identifying ways to align the system with the final-project rubric. One especially helpful suggestion was to reframe the recommender as an explainable and reliable applied AI system by adding confidence scoring, guardrails, logging, and an evaluation harness.
 
-## 2. Intended Use
+One flawed suggestion came up during implementation when a proposed code patch for the confidence layer did not match the current file structure and failed to apply cleanly. That was a helpful reminder that AI can accelerate development, but it still requires human review, correction, and verification. I treated AI as a strong assistant rather than as a source of unquestioned correctness.
 
-This model is designed for classroom exploration and simple experimentation. It recommends songs from a small catalog based on a listener's preferred genre, mood, energy, and acoustic preference. It is useful for showing how a content-based recommender works in plain language. It is not meant for real users or production streaming platforms.
+## How to Cite the Main Features
+If you want the quickest summary of what makes this a final applied AI system, the most important implementation points are:
+- `validate_user_preferences(...)` and `validate_recommendation_request(...)` for guardrails
+- `calculate_recommendation_confidence(...)` for reliability scoring
+- `build_recommendation_warnings(...)` for weak-match detection
+- `run_self_critique_loop(...)` for the agentic review step
+- `append_jsonl_log(...)` for observability
+- `evaluate_profile(...)` and `summarize_evaluation(...)` for evaluation
+- [src/streamlit_app.py](/c:/Users/saifs/ai110-applied-ai-system-final-project/src/streamlit_app.py:1) for the MusixxMatch interface
 
-## 3. How It Works (Short Explanation)
-
-The recommender looks at each song and compares it to the user's taste profile. It gives points for genre match, mood match, and energy similarity, and it gives a small extra bonus for acoustic songs when the user likes acoustic music. After scoring all songs, it sorts them from highest score to lowest score and returns the top recommendations. This makes the system easy to explain because each recommendation comes from a small set of visible rules.
-
-## 4. Data
-
-The dataset contains 25 songs in `data/songs.csv`. Each song has a title, artist, genre, mood, energy, tempo, valence, danceability, and acousticness. I expanded the starter file to add more genres and moods so the system could be tested on a wider range of user profiles. Even with those additions, the dataset is still small and does not include real listening behavior.
-
-## 5. Strengths
-
-The system works best for users with clear preferences, such as chill lofi listeners, intense rock listeners, or upbeat pop listeners. In those cases, the results often feel believable because the model captures broad vibe differences well. Another strength is that the scoring logic is transparent, so it is easy to understand why a song ranked high. That makes it useful for learning, debugging, and reflection.
-
-## 6. Limitations and Bias
-
-The system depends on exact labels for genre and mood, so it may miss songs that are similar but described with different words. It also gives energy to every song, which can make energy too important compared with other signals. That can create repetition or filter-bubble behavior, where certain songs keep rising because they sit near common energy targets. This is one reason songs like `Gym Hero` can appear for several different profiles.
-
-## 7. Evaluation
-
-I evaluated the recommender by running it with eight different user profiles and comparing the top results to my musical intuition. I checked whether the outputs changed in sensible ways when the profile changed from calm to intense, acoustic to electronic, or exact-match to no-categorical-match cases. I also ran a weight-shift experiment to see how sensitive the rankings were to scoring choices. That evaluation helped me notice both the strengths of the system and the places where energy bias was too strong.
-
-## 8. Future Work
-
-If I kept developing this project, I would add more user preference fields like tempo, valence, and danceability. I would also use softer matching for related genres and moods instead of requiring exact text matches. Another improvement would be adding a diversity rule so the top recommendations feel less repetitive and cover a wider range of songs.
-
-## 9. Personal Reflection
-
-My biggest learning moment was realizing that even a simple rules-based system can feel surprisingly smart when the features are chosen well. I also learned that small weight choices can create big changes in ranking and can introduce bias without being obvious at first. AI tools helped me move faster when I was brainstorming, writing, and testing ideas, but I still needed to verify the scoring logic, the outputs, and the documentation carefully. If I extended this project further, I would focus on making the recommender both more flexible and more diverse.
+## Model Card
+The earlier model card is still available at [model_card.md](/c:/Users/saifs/ai110-applied-ai-system-final-project/model_card.md:1).

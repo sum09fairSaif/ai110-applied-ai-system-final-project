@@ -1,0 +1,17 @@
+flowchart TD
+    A[User Input<br/>CLI or Streamlit App] --> B[Guardrail Validator<br/>normalize and validate preferences]
+    B --> C[Preference Enrichment<br/>infer defaults for decade, popularity, tags, vocals, replay]
+    C --> D[Song Catalog Loader<br/>data/songs.csv]
+    D --> E[Scoring Engine<br/>genre, mood, energy, era, popularity, tags, vocals, replay]
+    E --> F[Diversity Reranker<br/>reduce repeated artists and genres]
+    F --> G[Confidence and Warning Layer<br/>confidence score plus weak-match warnings]
+    G --> H[Self-Critique Loop<br/>review list quality and optionally adjust ranking]
+    H --> I[Recommendation Output<br/>table, cards, explanations]
+
+    I --> J[JSONL Logging<br/>logs/recommendation_log.jsonl]
+    I --> K[Human Review<br/>user sees confidence, warnings, critique]
+    K --> L[Evaluation Harness<br/>src/evaluate.py]
+    L --> M[Test Reports and Metrics<br/>confidence, warning rate, diversity, exact-match rate]
+
+    N[Automated Tests<br/>pytest suite] --> L
+    N --> E
