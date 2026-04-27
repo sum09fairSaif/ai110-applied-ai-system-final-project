@@ -131,6 +131,7 @@ class RecommendationDiagnostics:
     confidence: float
     explanation: str
     warnings: List[str]
+    critique_notes: Optional[List[str]] = None
 
 
 ScoringMode = Callable[[Dict[str, float]], float]
@@ -278,6 +279,7 @@ VALID_SCORING_MODES = set(SCORING_STRATEGIES)
 DIVERSITY_ARTIST_PENALTY = 1.25
 DIVERSITY_GENRE_PENALTY = 0.45
 LOW_CONFIDENCE_THRESHOLD = 0.50
+CRITIQUE_CONFIDENCE_GAP = 0.08
 COMPONENT_MAXIMA = {
     "genre_match": 1.0,
     "mood_match": 1.0,
@@ -458,6 +460,45 @@ def build_recommendation_warnings(explanation: str, confidence: float) -> List[s
         )
 
     return warnings
+
+
+def run_self_critique_loop(recommendations: List[Dict]) -> List[Dict]:
+    """Review recommendations, attach critique notes, and make small trust-oriented adjustments."""
+    if not recommendations:
+        return []
+
+    critiqued = [dict(item) for item in recommendations]
+    critique_notes: List[str] = []
+    average_confidence = sum(item["confidence"] for item in critiqued) / len(critiqued)
+
+    if average_confidence < LOW_CONFIDENCE_THRESHOLD:
+        critique_notes.append(
+            "Self-critique: the overall list has low average confidence, so the results should be treated as exploratory suggestions."
+        )
+
+    top_artist = critiqued[0]["song"]["artist"]
+    repeated_top_artist = sum(1 for item in critiqued if item["song"]["artist"] == top_artist)
+    if repeated_top_artist > 1:
+        critique_notes.append(
+            "Self-critique: the list leans heavily on one artist, which may reduce discovery diversity."
+        )
+
+    if len(critiqued) >= 2:
+        first_item = critiqued[0]
+        second_item = critiqued[1]
+        if (
+            first_item["confidence"] < LOW_CONFIDENCE_THRESHOLD
+            and second_item["confidence"] - first_item["confidence"] >= CRITIQUE_CONFIDENCE_GAP
+        ):
+            critiqued[0], critiqued[1] = second_item, first_item
+            critique_notes.append(
+                "Self-critique: promoted a stronger second recommendation ahead of a weaker top pick."
+            )
+
+    for item in critiqued:
+        item["critique_notes"] = list(critique_notes)
+
+    return critiqued
 
 
 def _score_components(user_prefs: Dict, song: Dict) -> Tuple[Dict[str, float], List[str]]:
@@ -720,4 +761,4 @@ def recommend_songs_with_diagnostics(
             }
         )
 
-    return diagnostics
+    return run_self_critique_loop(diagnostics)

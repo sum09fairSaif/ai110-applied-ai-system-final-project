@@ -21,13 +21,14 @@ from recommender import load_songs, recommend_songs_with_diagnostics
 
 def format_recommendation_table(recommendations: list[dict]) -> str:
     """Turn the recommendation results into a simple text table that is easy to read in the terminal."""
-    headers = ["Rank", "Title", "Artist", "Score", "Confidence", "Warnings", "Reasons"]
-    max_widths = [4, 22, 18, 5, 10, 40, 55]
+    headers = ["Rank", "Title", "Artist", "Score", "Confidence", "Warnings", "Critique", "Reasons"]
+    max_widths = [4, 22, 18, 5, 10, 40, 40, 55]
     rows = []
 
     for rank, result in enumerate(recommendations, 1):
         song = result["song"]
         warnings = "; ".join(result["warnings"]) if result["warnings"] else "None"
+        critique = "; ".join(result.get("critique_notes", [])) if result.get("critique_notes") else "None"
         rows.append([
             str(rank),
             song["title"],
@@ -35,6 +36,7 @@ def format_recommendation_table(recommendations: list[dict]) -> str:
             f'{result["score"]:.2f}',
             f'{result["confidence"]:.2f}',
             warnings,
+            critique,
             result["explanation"],
         ])
 

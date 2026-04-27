@@ -6,6 +6,7 @@ from src.recommender import (
     Recommender,
     recommend_songs,
     recommend_songs_with_diagnostics,
+    run_self_critique_loop,
     score_song,
 )
 
@@ -354,3 +355,72 @@ def test_strong_match_diagnostics_can_avoid_low_confidence_warning():
 
     assert results[0].confidence >= 0.45
     assert all("Low-confidence recommendation" not in warning for warning in results[0].warnings)
+
+
+def test_self_critique_adds_notes_for_low_confidence_lists():
+    """Check that the critique loop annotates weak recommendation lists with review notes."""
+    songs = [
+        {
+            "id": 1,
+            "title": "Soft Mismatch",
+            "artist": "Artist",
+            "genre": "ambient",
+            "mood": "peaceful",
+            "energy": 0.52,
+            "tempo_bpm": 70.0,
+            "valence": 0.5,
+            "danceability": 0.3,
+            "acousticness": 0.6,
+        }
+    ]
+
+    results = recommend_songs_with_diagnostics(
+        {
+            "favorite_genre": "metal",
+            "favorite_mood": "rebellious",
+            "target_energy": 0.5,
+            "likes_acoustic": False,
+        },
+        songs,
+        k=1,
+    )
+
+    assert results[0]["critique_notes"]
+    assert any("overall list has low average confidence" in note for note in results[0]["critique_notes"])
+
+
+def test_self_critique_can_promote_stronger_second_recommendation():
+    """Check that the critique loop can move a clearly stronger second option to the top."""
+    results = run_self_critique_loop(
+        [
+            {
+                "song": {
+                    "id": 1,
+                    "title": "Weak First Pick",
+                    "artist": "Artist A",
+                    "genre": "ambient",
+                },
+                "score": 3.0,
+                "confidence": 0.40,
+                "explanation": "mode=genre_first, energy similarity (+1.50)",
+                "warnings": [
+                    "Low-confidence recommendation: this match relies more on soft feature similarity than strong direct preference matches."
+                ],
+            },
+            {
+                "song": {
+                    "id": 2,
+                    "title": "Stronger Second Pick",
+                    "artist": "Artist B",
+                    "genre": "pop",
+                },
+                "score": 3.2,
+                "confidence": 0.52,
+                "explanation": "mode=genre_first, genre match (+1.0), mood match (+1.0)",
+                "warnings": [],
+            },
+        ]
+    )
+
+    assert results[0]["song"]["title"] == "Stronger Second Pick"
+    assert any("promoted a stronger second recommendation" in note for note in results[0]["critique_notes"])
