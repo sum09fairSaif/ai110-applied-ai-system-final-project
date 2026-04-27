@@ -262,6 +262,7 @@ SCORING_STRATEGIES = {
     mode_name: _build_weighted_mode(weights)
     for mode_name, weights in SCORING_MODE_WEIGHTS.items()
 }
+VALID_SCORING_MODES = set(SCORING_STRATEGIES)
 
 DIVERSITY_ARTIST_PENALTY = 1.25
 DIVERSITY_GENRE_PENALTY = 0.45
@@ -271,6 +272,134 @@ def get_scoring_mode(mode_name: Optional[str]) -> Tuple[str, ScoringMode]:
     """Choose the scoring style the user asked for, or fall back to the default mode."""
     normalized_mode = (mode_name or "balanced").strip().lower()
     return normalized_mode, SCORING_STRATEGIES.get(normalized_mode, SCORING_STRATEGIES["balanced"])
+
+
+def _normalize_text(value: object, field_name: str) -> str:
+    """Convert a required text field into a clean lowercase string."""
+    cleaned = str(value).strip().lower()
+    if not cleaned:
+        raise ValueError(f"{field_name} must be a non-empty string.")
+    return cleaned
+
+
+def _normalize_optional_float(
+    user_prefs: Dict,
+    field_name: str,
+    lower: float = 0.0,
+    upper: float = 1.0,
+) -> Optional[float]:
+    """Validate an optional float field when the user supplies one."""
+    raw_value = user_prefs.get(field_name)
+    if raw_value is None:
+        return None
+
+    try:
+        numeric_value = float(raw_value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{field_name} must be a number.") from exc
+
+    if not lower <= numeric_value <= upper:
+        raise ValueError(f"{field_name} must be between {lower} and {upper}.")
+    return numeric_value
+
+
+def _normalize_optional_int(
+    user_prefs: Dict,
+    field_name: str,
+    lower: int,
+    upper: int,
+) -> Optional[int]:
+    """Validate an optional integer field when the user supplies one."""
+    raw_value = user_prefs.get(field_name)
+    if raw_value is None:
+        return None
+
+    try:
+        numeric_value = int(raw_value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{field_name} must be an integer.") from exc
+
+    if not lower <= numeric_value <= upper:
+        raise ValueError(f"{field_name} must be between {lower} and {upper}.")
+    return numeric_value
+
+
+def validate_user_preferences(user_prefs: Dict) -> Dict:
+    """Normalize and validate user preferences before scoring songs."""
+    if not isinstance(user_prefs, dict):
+        raise ValueError("user_prefs must be a dictionary.")
+
+    favorite_genre = _normalize_text(user_prefs.get("favorite_genre", ""), "favorite_genre")
+    favorite_mood = _normalize_text(user_prefs.get("favorite_mood", ""), "favorite_mood")
+
+    try:
+        target_energy = float(user_prefs.get("target_energy"))
+    except (TypeError, ValueError) as exc:
+        raise ValueError("target_energy must be a number between 0.0 and 1.0.") from exc
+
+    if not 0.0 <= target_energy <= 1.0:
+        raise ValueError("target_energy must be between 0.0 and 1.0.")
+
+    likes_acoustic = user_prefs.get("likes_acoustic")
+    if not isinstance(likes_acoustic, bool):
+        raise ValueError("likes_acoustic must be a boolean value.")
+
+    normalized_mode = str(user_prefs.get("scoring_mode", "balanced")).strip().lower() or "balanced"
+    if normalized_mode not in VALID_SCORING_MODES:
+        normalized_mode = "balanced"
+
+    bonus_mood_tags = user_prefs.get("bonus_mood_tags")
+    if bonus_mood_tags is not None:
+        if not isinstance(bonus_mood_tags, list):
+            raise ValueError("bonus_mood_tags must be a list of strings.")
+        normalized_bonus_tags = [
+            _normalize_text(tag, "bonus_mood_tags item")
+            for tag in bonus_mood_tags
+        ]
+    else:
+        normalized_bonus_tags = None
+
+    prefers_instrumental = user_prefs.get("prefers_instrumental")
+    if prefers_instrumental is not None and not isinstance(prefers_instrumental, bool):
+        raise ValueError("prefers_instrumental must be a boolean value when provided.")
+
+    preferred_decade = _normalize_optional_int(user_prefs, "preferred_decade", 1900, 2030)
+    target_popularity = _normalize_optional_int(user_prefs, "target_popularity", 0, 100)
+    target_vocal_presence = _normalize_optional_float(user_prefs, "target_vocal_presence")
+    target_replay_value = _normalize_optional_float(user_prefs, "target_replay_value")
+
+    return {
+        "favorite_genre": favorite_genre,
+        "favorite_mood": favorite_mood,
+        "target_energy": target_energy,
+        "likes_acoustic": likes_acoustic,
+        "preferred_decade": preferred_decade,
+        "target_popularity": target_popularity,
+        "bonus_mood_tags": normalized_bonus_tags,
+        "prefers_instrumental": prefers_instrumental,
+        "target_vocal_presence": target_vocal_presence,
+        "target_replay_value": target_replay_value,
+        "scoring_mode": normalized_mode,
+    }
+
+
+def validate_recommendation_request(user_prefs: Dict, songs: List[Dict], k: int) -> Dict:
+    """Validate the inputs for recommendation requests and return normalized preferences."""
+    normalized_user_prefs = validate_user_preferences(user_prefs)
+
+    try:
+        normalized_k = int(k)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("k must be a positive integer.") from exc
+
+    if normalized_k <= 0:
+        raise ValueError("k must be a positive integer.")
+
+    if not songs:
+        raise ValueError("songs must contain at least one song.")
+
+    normalized_user_prefs["k"] = normalized_k
+    return normalized_user_prefs
 
 
 def _score_components(user_prefs: Dict, song: Dict) -> Tuple[Dict[str, float], List[str]]:
@@ -424,21 +553,26 @@ class Recommender:
 
     def recommend(self, user: UserProfile, k: int = 5) -> List[Song]:
         """Pick the best songs for a user after scoring them and applying the diversity rules."""
-        user_prefs = asdict(user)
+        user_prefs = validate_recommendation_request(
+            asdict(user),
+            [_song_to_dict(song) for song in self.songs],
+            k,
+        )
         ranked = []
         for song in self.songs:
             score, reasons = score_song(user_prefs, _song_to_dict(song))
             ranked.append((_song_to_dict(song), score, reasons))
 
         ranked.sort(key=lambda item: item[1], reverse=True)
-        diversified = apply_diversity_reranking(ranked, k)
+        diversified = apply_diversity_reranking(ranked, user_prefs["k"])
         song_by_id = {song.id: song for song in self.songs}
         return [song_by_id[item[0]["id"]] for item in diversified]
 
     def explain_recommendation(self, user: UserProfile, song: Song) -> str:
         """Explain in simple text why a song matched this user's preferences."""
-        _, reasons = score_song(asdict(user), _song_to_dict(song))
-        mode_name, _ = get_scoring_mode(user.scoring_mode)
+        normalized_user = validate_user_preferences(asdict(user))
+        _, reasons = score_song(normalized_user, _song_to_dict(song))
+        mode_name, _ = get_scoring_mode(normalized_user["scoring_mode"])
         summary = ", ".join(reasons) if reasons else "balanced overall fit"
         return f"{mode_name} mode: {summary}"
 
@@ -475,7 +609,7 @@ def load_songs(csv_path: str) -> List[Dict]:
 
 def score_song(user_prefs: Dict, song: Dict) -> Tuple[float, List[str]]:
     """Give one song a score by comparing its features to what the user likes."""
-
+    user_prefs = validate_user_preferences(user_prefs)
     mode_name, score_strategy = get_scoring_mode(user_prefs.get("scoring_mode"))
     components, reasons = _score_components(user_prefs, song)
     score = score_strategy(components)
@@ -485,11 +619,11 @@ def score_song(user_prefs: Dict, song: Dict) -> Tuple[float, List[str]]:
 
 def recommend_songs(user_prefs: Dict, songs: List[Dict], k: int = 5) -> List[Tuple[Dict, float, str]]:
     """Score all songs, sort them, and return the best few with short explanations."""
-
+    normalized_user_prefs = validate_recommendation_request(user_prefs, songs, k)
     scored = []
     for song in songs:
-        score, reasons = score_song(user_prefs, song)
+        score, reasons = score_song(normalized_user_prefs, song)
         scored.append((song, score, reasons))
 
     scored.sort(key=lambda item: item[1], reverse=True)
-    return apply_diversity_reranking(scored, k)
+    return apply_diversity_reranking(scored, normalized_user_prefs["k"])

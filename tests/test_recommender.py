@@ -1,4 +1,6 @@
-from src.recommender import Song, UserProfile, Recommender
+import pytest
+
+from src.recommender import Song, UserProfile, Recommender, recommend_songs, score_song
 
 def make_small_recommender() -> Recommender:
     """Create a tiny two-song recommender that the tests can use quickly."""
@@ -165,3 +167,103 @@ def test_diversity_penalty_discourages_repeated_artist_in_top_results():
 
     assert results[0].artist == "Artist A"
     assert results[1].artist == "Artist B"
+
+
+def test_recommend_raises_for_invalid_k():
+    """Check that the recommender rejects non-positive result counts."""
+    user = UserProfile(
+        favorite_genre="pop",
+        favorite_mood="happy",
+        target_energy=0.8,
+        likes_acoustic=False,
+    )
+    rec = make_small_recommender()
+
+    with pytest.raises(ValueError, match="k must be a positive integer"):
+        rec.recommend(user, k=0)
+
+
+def test_score_song_raises_for_out_of_range_energy():
+    """Check that invalid energy inputs are stopped before scoring."""
+    song = {
+        "id": 1,
+        "title": "Test Song",
+        "artist": "Artist",
+        "genre": "pop",
+        "mood": "happy",
+        "energy": 0.5,
+        "tempo_bpm": 120.0,
+        "valence": 0.7,
+        "danceability": 0.7,
+        "acousticness": 0.2,
+    }
+
+    with pytest.raises(ValueError, match="target_energy must be between 0.0 and 1.0"):
+        score_song(
+            {
+                "favorite_genre": "pop",
+                "favorite_mood": "happy",
+                "target_energy": 1.5,
+                "likes_acoustic": False,
+            },
+            song,
+        )
+
+
+def test_recommend_songs_raises_for_empty_required_text_fields():
+    """Check that blank genre or mood values are rejected cleanly."""
+    songs = [
+        {
+            "id": 1,
+            "title": "Test Song",
+            "artist": "Artist",
+            "genre": "pop",
+            "mood": "happy",
+            "energy": 0.5,
+            "tempo_bpm": 120.0,
+            "valence": 0.7,
+            "danceability": 0.7,
+            "acousticness": 0.2,
+        }
+    ]
+
+    with pytest.raises(ValueError, match="favorite_genre must be a non-empty string"):
+        recommend_songs(
+            {
+                "favorite_genre": "   ",
+                "favorite_mood": "happy",
+                "target_energy": 0.5,
+                "likes_acoustic": False,
+            },
+            songs,
+            k=1,
+        )
+
+
+def test_unknown_scoring_mode_falls_back_to_balanced():
+    """Check that unknown scoring modes are normalized to a safe default."""
+    song = {
+        "id": 1,
+        "title": "Test Song",
+        "artist": "Artist",
+        "genre": "pop",
+        "mood": "happy",
+        "energy": 0.8,
+        "tempo_bpm": 120.0,
+        "valence": 0.7,
+        "danceability": 0.7,
+        "acousticness": 0.2,
+    }
+
+    _, reasons = score_song(
+        {
+            "favorite_genre": " POP ",
+            "favorite_mood": " HAPPY ",
+            "target_energy": 0.8,
+            "likes_acoustic": False,
+            "scoring_mode": "totally_unknown_mode",
+        },
+        song,
+    )
+
+    assert reasons[0] == "mode=balanced"
