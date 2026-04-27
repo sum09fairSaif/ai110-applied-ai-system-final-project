@@ -59,3 +59,51 @@ def test_explain_recommendation_returns_non_empty_string():
     explanation = rec.explain_recommendation(user, song)
     assert isinstance(explanation, str)
     assert explanation.strip() != ""
+
+
+def test_scoring_modes_can_change_ranking_priority():
+    songs = [
+        Song(
+            id=1,
+            title="Exact Genre Song",
+            artist="Test Artist",
+            genre="pop",
+            mood="sad",
+            energy=0.4,
+            tempo_bpm=100,
+            valence=0.4,
+            danceability=0.5,
+            acousticness=0.2,
+        ),
+        Song(
+            id=2,
+            title="Exact Mood Song",
+            artist="Test Artist",
+            genre="rock",
+            mood="happy",
+            energy=0.4,
+            tempo_bpm=100,
+            valence=0.4,
+            danceability=0.5,
+            acousticness=0.2,
+        ),
+    ]
+    rec = Recommender(songs)
+
+    genre_user = UserProfile(
+        favorite_genre="pop",
+        favorite_mood="happy",
+        target_energy=0.4,
+        likes_acoustic=False,
+        scoring_mode="genre_first",
+    )
+    mood_user = UserProfile(
+        favorite_genre="pop",
+        favorite_mood="happy",
+        target_energy=0.4,
+        likes_acoustic=False,
+        scoring_mode="mood_first",
+    )
+
+    assert rec.recommend(genre_user, k=2)[0].title == "Exact Genre Song"
+    assert rec.recommend(mood_user, k=2)[0].title == "Exact Mood Song"
