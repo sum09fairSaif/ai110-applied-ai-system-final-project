@@ -92,6 +92,11 @@ To reduce misuse or overconfidence, the system includes:
 - JSONL session logging
 - clear documentation of limitations
 
+## AI Collaboration
+AI was helpful during this project when it suggested reframing the recommender as an explainable and reliable applied AI system rather than leaving it as a simple recommendation script. That suggestion directly shaped the addition of guardrails, confidence scoring, logging, the evaluation harness, and the self-critique loop.
+
+AI was not always correct, though. One flawed suggestion happened when a proposed code patch for the confidence layer did not match the current file structure and failed to apply cleanly. That experience reinforced the importance of treating AI as a strong assistant for brainstorming and iteration, while still relying on human review, debugging, and verification for correctness.
+
 ## Future Improvements
 - add softer matching between related genres and moods
 - expand the song catalog
