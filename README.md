@@ -32,7 +32,7 @@ MusixxMatch is organized as a modular pipeline:
 7. The final recommendations are shown to the user and saved to a JSONL log.
 8. A separate evaluation harness tests the system across predefined profiles and summarizes reliability metrics.
 
-The Mermaid source for the architecture diagram is included in [assets/musixxmatch-architecture.mmd](/c:/Users/saifs/ai110-applied-ai-system-final-project/assets/musixxmatch-architecture.mmd:1). You can paste it into Mermaid Live Editor and export a PNG into the `assets/` folder.
+The Mermaid source for the architecture diagram is included in [assets/musixxmatch-architecture.mmd](/c:/Users/saifs/ai110-applied-ai-system-final-project/assets/musixxmatch-architecture.mmd:1).
 
 ![MusixxMatch architecture diagram](assets/musixxmatch-architecture.png)
 
