@@ -191,16 +191,3 @@ What surprised me most was how reasonable some weak matches looked before confid
 AI was useful as a collaborator for brainstorming features, improving project structure, and identifying ways to align the system with the final-project rubric. One especially helpful suggestion was to reframe the recommender as an explainable and reliable applied AI system by adding confidence scoring, guardrails, logging, and an evaluation harness.
 
 One flawed suggestion came up during implementation when a proposed code patch for the confidence layer did not match the current file structure and failed to apply cleanly. That was a helpful reminder that AI can accelerate development, but it still requires human review, correction, and verification. I treated AI as a strong assistant rather than as a source of unquestioned correctness.
-
-## How to Cite the Main Features
-If you want the quickest summary of what makes this a final applied AI system, the most important implementation points are:
-- `validate_user_preferences(...)` and `validate_recommendation_request(...)` for guardrails
-- `calculate_recommendation_confidence(...)` for reliability scoring
-- `build_recommendation_warnings(...)` for weak-match detection
-- `run_self_critique_loop(...)` for the agentic review step
-- `append_jsonl_log(...)` for observability
-- `evaluate_profile(...)` and `summarize_evaluation(...)` for evaluation
-- [src/streamlit_app.py](/c:/Users/saifs/ai110-applied-ai-system-final-project/src/streamlit_app.py:1) for the MusixxMatch interface
-
-## Model Card
-The earlier model card is still available at [model_card.md](/c:/Users/saifs/ai110-applied-ai-system-final-project/model_card.md:1).
